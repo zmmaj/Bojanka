@@ -879,15 +879,11 @@ void clear_canvas(void) {
   
 
     // Clear the screen by filling it with white (or any other color)
-    for (size_t y = 43; y < height-8; y++) {
-        for (size_t x = 2; x < width+6; x++) {
-            // Create a rectangle of size 1x1 at position (x, y)
-            gfx_fill_rect(paint.gc, &(gfx_rect_t){
-                .p0 = { x, y },      // Top-left corner (x, y)
-                .p1 = { x + 1, y + 1 }  // Bottom-right corner (x + 1, y + 1)
-            });
-        }
-    }
+    gfx_rect_t rect = {
+        .p0 = { 2, 43 },
+        .p1 = { width + 6, height - 8 }
+    };
+    gfx_fill_rect(paint.gc, &rect);
 
     // Update the screen with the new content
     gfx_update(paint.gc);  // This should render the filled canvas to the screen
