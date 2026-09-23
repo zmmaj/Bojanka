@@ -447,43 +447,56 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
  paint.bparams1.rect.p1.y = paint.app_rect.p1.y;
 
  printf("2\n");
-gfx_color_new_rgb_i16(0xFFFF, 0xFFFF, 0xFFFF, &paint.color);  // White color
-
-    gfx_set_color(paint.gc, paint.color);
-clear_canvas();
-printf("3\n");
+    
+ // 1. Prvo kreiramo bitmape jer su one osnova za platno
  rc = gfx_bitmap_create(paint.gc, &paint.bparams, NULL, &paint.bitmap);
-  if (rc != EOK) {
-    printf("Greska pri kreiranju bitmap.\n");
-    return rc;  
-  }
-   rc = gfx_bitmap_create(paint.gc, &paint.bparams1, NULL, &paint.bitmap1);
-  if (rc != EOK) {
-    printf("Greska pri kreiranju bitmap.\n");
-    return rc;  
-  }
-   printf("4\n");
-    init_pixelmap();
+ if (rc != EOK) {
+     printf("Greska pri kreiranju bitmap.\n");
+     return rc;  
+ }
+ 
+ rc = gfx_bitmap_create(paint.gc, &paint.bparams1, NULL, &paint.bitmap1);
+ if (rc != EOK) {
+     printf("Greska pri kreiranju bitmap.\n");
+     return rc;  
+ }
+ 
+ printf("3\n");
+ init_pixelmap();
 
-    ui_menu_bar_paint(paint.menubar);
+ // 2. Postavljamo defaultne vrednosti aplikacije pre prvog iscrtavanja
+ paint.draw_mode = DRAW_MODE_FREEHAND;  // Slobodno crtanje
+ paint.brush_size = 1;                  // Debljina 1px
 
-errno_t rc = ui_wdecor_paint(paint.wdecor);
-if (rc != EOK) {
-    printf("Error repainting window decorations: %d\n", rc);
-}
-    
-    gfx_update(paint.gc);
-    push_undo();
-    ui_run(paint.ui);
-    
+ // 3. Eksplicitno inicijalizujemo crnu boju (0x0000, 0x0000, 0x0000)
+ // Ovo će ispravno ažurirati sistem, ubaciti boju u grafički kontekst i osvežiti statusnu traku
+ set_color(&paint, 0x0000, 0x0000, 0x0000);
 
-    // Clean up allocated memory
-    ui_label_destroy(paint.status);
-    ui_label_destroy(paint.label_boja);
-    gfx_bitmap_destroy(paint.bitmap);
-    ui_window_destroy(paint.window);
-    ui_destroy(paint.ui);
-    return 0;
+ // 4. Sada bezbedno čistimo platno (clear_canvas interno koristi belu boju za punjenje)
+ clear_canvas();
+
+ // 5. Vraćamo aktivnu crnu boju u grafički kontekst jer ju je clear_canvas promenio u belu
+ gfx_set_color(paint.gc, paint.color);
+
+ printf("4\n");
+ ui_menu_bar_paint(paint.menubar);
+
+ rc = ui_wdecor_paint(paint.wdecor);
+ if (rc != EOK) {
+     printf("Error repainting window decorations: %d\n", rc);
+ }
+ 
+ gfx_update(paint.gc);
+ push_undo();
+ ui_run(paint.ui);
+ 
+ // Clean up allocated memory
+ ui_label_destroy(paint.status);
+ ui_label_destroy(paint.label_boja);
+ gfx_bitmap_destroy(paint.bitmap);
+ ui_window_destroy(paint.window);
+ ui_destroy(paint.ui);
+ return 0;
 }
 
 /** @}
