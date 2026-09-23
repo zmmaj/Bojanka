@@ -14,6 +14,7 @@
 #include <ui/menubar.h>
 #include <ui/menudd.h>
 #include <ui/menuentry.h>
+#include <ui/filedialog.h>
 #include <str.h>
 #include <io/pixelmap.h>
 #include <io/pixel.h>
@@ -22,6 +23,7 @@
 #include <gfx/coord.h>  
 #include <io/pixelmap.h>
 #include <memgfx/memgc.h>
+#include <rle.h>
 
 
 #define UI_EVCLAIMED 1
@@ -38,7 +40,14 @@ typedef unsigned short u16;
 #define ALIGN_TO(x, a)  (((x) + ((a)-1)) & ~((a)-1))
  #define STACK_CHUNK_SIZE 10000  // Veličina jednog "komada" stoga
 #define TOLERANCE 10  // Tolerancija za poređenje boja
+#define MAX_UNDO_STEPS 10
 
+
+typedef struct {
+    rle_image_t steps[MAX_UNDO_STEPS];
+    int count;   /* koliko je popunjeno (0..MAX_UNDO_STEPS) */
+    int head;    /* gde je trenutni (1..count) */
+} undo_stack_t;
 
 typedef struct {
     ui_t *ui;
@@ -87,6 +96,10 @@ typedef struct {
      gfx_bitmap_alloc_t pixels;
      gfx_bitmap_params_t previous_params;  // Prethodni parametri bitmape
     bool is_direct_output;   
+
+    undo_stack_t undo_stack;
+
+    ui_file_dialog_t *dialog;
 } paint_t;
 
 extern paint_t paint;
@@ -139,7 +152,6 @@ extern void wnd_pos_event(ui_window_t *window, void *arg, pos_event_t *event);
 extern void cursor_setvis(bool visible);
 
 // Function prototypes
-void draw_pixel(gfx_context_t *gc, int x, int y, int color);
 void draw_line(gfx_context_t *gc, gfx_coord2_t pos1, gfx_coord2_t pos2);
 
 void draw_rect(gfx_context_t *gc, sysarg_t x, sysarg_t y, sysarg_t width, sysarg_t height, gfx_color_t color, bool filled);
@@ -171,4 +183,12 @@ void flood_fill_iterative(sysarg_t x, sysarg_t y, uint8_t r, uint8_t g, uint8_t 
 void flood_fill_dfs(sysarg_t x, sysarg_t y, uint8_t r, uint8_t g, uint8_t b, uint8_t new_r, uint8_t new_g, uint8_t new_b);
 void close_log_file(void);
 void pixelmap_to_file(const char *file_name,pixelmap_t pixelmap);
+
+bool load_boj(const char *filename, gfx_bitmap_t *bitmap, size_t pitch);
+bool save_boj(const char *filename, gfx_bitmap_t *bitmap,
+    int width, int height, size_t pitch);
+
+void undo_stack_clear(void);
+
+
 #endif // DRAW_H
