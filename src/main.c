@@ -60,7 +60,7 @@ void update_status_bar(paint_t *paint, const char *text) {
 }
 void update_status_bar1(paint_t *paint, const char *text) {
     ui_label_destroy(paint->label_boja);
-    gfx_update(paint->gc);
+
     rc = ui_label_create(paint->ui_res, "", &paint->label_boja);
     if (rc != EOK) {
         printf("Greska pri kreiranju STATUS1-a.\n");
@@ -238,23 +238,14 @@ void wnd_close(ui_window_t *window, void *arg) {
     ui_quit(paint->ui);
 }
 
-void cursor_setvis(bool visible)
-{
-    //gfx_context_t *gc = ui_window_get_gc(&paint->window);
-    return;
-    //(void) gfx_cursor_set_visible(gc, visible);
-}
+
 
 // Callback for handling window decoration events
 static void wdecor_close(ui_wdecor_t *, void *);
 static void wdecor_move(ui_wdecor_t *, void *, gfx_coord2_t *, sysarg_t);
 
 static void wdecor_close(ui_wdecor_t *, void *) {
-   // paint_t *paint = (paint_t *)arg;
-    printf("Close button clicked!\n");
-    ui_wdecor_close(paint.wdecor);
-    ui_wdecor_destroy(paint.wdecor);
-    ui_window_destroy(paint.window);
+    ui_quit(paint.ui);
 }
 
 static void wdecor_move(ui_wdecor_t *, void *, gfx_coord2_t *, sysarg_t) {
@@ -429,7 +420,7 @@ ui_wdecor_set_cb(paint.wdecor, &wdecor_cb, (void *) &paint);
         return 1;
     }
 
-printf("1\n");
+
     gfx_bitmap_params_init(&paint.bparams);
  paint.bparams.rect.p0.x = paint.app_rect.p0.x;
  paint.bparams.rect.p0.y = paint.app_rect.p0.y;
@@ -446,7 +437,7 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
  paint.bparams1.rect.p1.x =  paint.app_rect.p1.x;
  paint.bparams1.rect.p1.y = paint.app_rect.p1.y;
 
- printf("2\n");
+
     
  // 1. Prvo kreiramo bitmape jer su one osnova za platno
  rc = gfx_bitmap_create(paint.gc, &paint.bparams, NULL, &paint.bitmap);
@@ -461,7 +452,7 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
      return rc;  
  }
  
- printf("3\n");
+
  init_pixelmap();
 
  // 2. Postavljamo defaultne vrednosti aplikacije pre prvog iscrtavanja
@@ -478,7 +469,7 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
  // 5. Vraćamo aktivnu crnu boju u grafički kontekst jer ju je clear_canvas promenio u belu
  gfx_set_color(paint.gc, paint.color);
 
- printf("4\n");
+
  ui_menu_bar_paint(paint.menubar);
 
  rc = ui_wdecor_paint(paint.wdecor);
@@ -498,6 +489,7 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
  ui_destroy(paint.ui);
  return 0;
 }
+
 
 /** @}
  */
