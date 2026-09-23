@@ -44,6 +44,8 @@ typedef unsigned short u16;
 static char buffer[64];
 static char buffer1[64];
 
+
+
 //Status BAR
 void update_status_bar(paint_t *paint, const char *text) {
     ui_label_destroy(paint->status);
@@ -81,15 +83,13 @@ void update_status_bar1(paint_t *paint, const char *text) {
     paint->last_green = green;
     paint->last_blue = blue;
 
-
-    printf("Setting color: R=%04X, G=%04X, B=%04X\n", red, green, blue);
     if (paint->color) {
         gfx_color_delete(paint->color);
     }
 
     rc = gfx_color_new_rgb_i16(red, green, blue, &paint->color);
     if (rc != EOK) {
-        printf("Greska pri kreiranju color.\n");
+        printf("Greska pri kreiranju boje.\n");
         return rc;
     }
 
@@ -97,7 +97,7 @@ void update_status_bar1(paint_t *paint, const char *text) {
     // Apply color immediately to ensure persistence
     rc = gfx_set_color(paint->gc, paint->color);
     if (rc != EOK) {
-        printf("Error setting color.\n");
+        printf("Greska pri kreiranju boje.\n");
         return rc;
     }
      gfx_update(paint->gc);
@@ -264,7 +264,7 @@ static ui_wdecor_cb_t wdecor_cb = {
 
 
 int main(int argc, char* argv[]) {
-    printf("\n\t\tSimple paint app\n\n");
+    printf("\n\t\tJednostavna Bojanka\n\n");
     const char *display_spec = UI_ANY_DEFAULT;
    // Initialize the undo/redo system
 
@@ -277,13 +277,13 @@ int main(int argc, char* argv[]) {
     paint.prev_pos.x = -1;  // Invalid initial position
     paint.prev_pos.y = -1;
     paint.cursor_move = 0;
- /*
+
     rc = gfx_color_new_rgb_i16(0xffff, 0xffff, 0xffff, &paint.color);
     if (rc != EOK) {
         printf("Nisam postavio boju.\n");
         return 1;
     }
-*/
+
     paint.center.x = 0;
     paint.center.y = 0;
 
@@ -399,13 +399,13 @@ int main(int argc, char* argv[]) {
 
     paint.gc = ui_window_get_gc(paint.window); // Enable graphics context
     if (paint.gc == NULL) {
-        printf("Error obtaining graphics context.\n");
+        printf("Ne mogu da nadjem graficki kontext.\n");
         return 1;
     }
 
  rc = ui_wdecor_create(paint.ui_res, "PAINT", ui_wds_decorated, &paint.wdecor);
 if (rc != EOK) {
-    printf("Greska pri kreiranju window decorations: %d\n", rc);
+    printf("Greska pri kreiranju dekoracije prozora: %d\n", rc);
     return rc;
 }
 
@@ -455,17 +455,18 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
 
  init_pixelmap();
 
- // 2. Postavljamo defaultne vrednosti aplikacije pre prvog iscrtavanja
- paint.draw_mode = DRAW_MODE_FREEHAND;  // Slobodno crtanje
- paint.brush_size = 1;                  // Debljina 1px
+/* Inicijalizuj undo stack */
+memset(&paint.undo_stack, 0, sizeof(paint.undo_stack));
 
- // 3. Eksplicitno inicijalizujemo crnu boju (0x0000, 0x0000, 0x0000)
- // Ovo će ispravno ažurirati sistem, ubaciti boju u grafički kontekst i osvežiti statusnu traku
- set_color(&paint, 0x0000, 0x0000, 0x0000);
+ 
+
+
 
  // 4. Sada bezbedno čistimo platno (clear_canvas interno koristi belu boju za punjenje)
  clear_canvas();
-
+ // 3. Eksplicitno inicijalizujemo crnu boju (0x0000, 0x0000, 0x0000)
+ // Ovo će ispravno ažurirati sistem, ubaciti boju u grafički kontekst i osvežiti statusnu traku
+ set_color(&paint, 0x0000, 0x0000, 0x0000);
  // 5. Vraćamo aktivnu crnu boju u grafički kontekst jer ju je clear_canvas promenio u belu
  gfx_set_color(paint.gc, paint.color);
 
@@ -474,7 +475,7 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
 
  rc = ui_wdecor_paint(paint.wdecor);
  if (rc != EOK) {
-     printf("Error repainting window decorations: %d\n", rc);
+     printf("Greska pri bojanju dekoracije prozora: %d\n", rc);
  }
  
  gfx_update(paint.gc);
@@ -482,6 +483,11 @@ paint.width= paint.app_rect.p1.x - paint.app_rect.p0.x;
  ui_run(paint.ui);
  
  // Clean up allocated memory
+/* Oslobodi undo stack */
+for (int i = 0; i < paint.undo_stack.count; i++) {
+    rle_free(&paint.undo_stack.steps[i]);
+}
+
  ui_label_destroy(paint.status);
  ui_label_destroy(paint.label_boja);
  gfx_bitmap_destroy(paint.bitmap);
