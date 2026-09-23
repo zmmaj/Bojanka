@@ -878,12 +878,11 @@ void clear_canvas(void) {
     // Set the color to white (or any other color you want)
   
 
-    // Clear the screen by filling it with white (or any other color)
-    gfx_rect_t rect = {
+    gfx_rect_t fill_rect = {
         .p0 = { 2, 43 },
         .p1 = { width + 6, height - 8 }
     };
-    gfx_fill_rect(paint.gc, &rect);
+    gfx_fill_rect(paint.gc, &fill_rect);
 
     // Update the screen with the new content
     gfx_update(paint.gc);  // This should render the filled canvas to the screen
