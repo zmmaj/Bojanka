@@ -40,28 +40,6 @@ typedef struct {
     int x, y;
 } Point;
 
-// Function to draw a pixel at specific coordinates
-void draw_pixel(gfx_context_t *mgc, int x, int y, int color) {
-    pixelmap_t pixelmap;
-
-    // Initialize pixelmap dimensions from gfx_context_t
-    pixelmap.width = 500; //paint->rect.p1.x - paint->rect.p0.x;
-    pixelmap.height = 400; //paint->rect.p1.y - paint->rect.p0.y;
-
-    // Check if the dimensions are valid
-    if (pixelmap.width <= 0 || pixelmap.height <= 0) {
-        printf("Error: Invalid pixelmap dimensions.\n");
-        return;
-    }
-
-    // Verify the coordinates
-    if (x < 0 || x >= (int)pixelmap.width || y < 0 || y >= (int)pixelmap.height) {
-        printf("Error: Coordinates (%d, %d) are out of bounds.\n", x, y);
-        return;
-    }
-
-    pixelmap_put_pixel(&pixelmap, x, y, color);
-}
 
 // Function to draw a line between two points using Bresenham's line algorithm
 void draw_line(gfx_context_t *ctx, gfx_coord2_t pos1, gfx_coord2_t pos2) {
@@ -496,7 +474,7 @@ void flood_fill_iterative(sysarg_t x, sysarg_t y,
     queue_end++;
 
     while (queue_start < queue_end) {
-        gfx_update(paint.gc); // Ažuriraj grafički kontekst tokom popunjavanja
+     
         Point p = queue[queue_start++]; // Uzmi piksel iz reda
 
         // Provera granica koristeći effective_width za horizontalne koordinate
