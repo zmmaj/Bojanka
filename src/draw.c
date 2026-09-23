@@ -66,7 +66,7 @@ void save_bmp(const char *filename, gfx_bitmap_t *bitmap) {
     gfx_bitmap_alloc_t alloc_info;
     errno_t err = gfx_bitmap_get_alloc(paint.bitmap, &alloc_info);
     if (err != EOK) {
-        printf("Error getting bitmap allocation info\n");
+        printf("Ne mogu da dobijem info alokacije\n");
         return;
     }
 
@@ -74,7 +74,7 @@ void save_bmp(const char *filename, gfx_bitmap_t *bitmap) {
     int height = paint.bparams.rect.p1.y;
 
     uint8_t *pixel_data = (uint8_t *)alloc_info.pixels + alloc_info.off0;
-    printf("Calculated parameters.\n");
+
 
     FILE *f = fopen(filename, "wb");
     if (!f) {
@@ -147,73 +147,10 @@ void save_bmp(const char *filename, gfx_bitmap_t *bitmap) {
     fclose(f);
     printf("BMP image saved as %s\n", filename);
 }
-/*
-void save_tga(const char *filename, gfx_bitmap_t *bitmap) {
-    printf("Saving 16-bit TGA image to %s\n", filename);
 
-    gfx_bitmap_alloc_t alloc_info;
-    errno_t err = gfx_bitmap_get_alloc(bitmap, &alloc_info);
-    if (err != EOK) {
-        printf("Error getting bitmap allocation info\n");
-        return;
-    }
 
-    int width = paint.bparams.rect.p1.x;
-    int height = paint.bparams.rect.p1.y;
-
-    uint8_t *pixel_data = (uint8_t *)alloc_info.pixels + alloc_info.off0;
-    printf("Image size: %dx%d\n", width, height);
-
-    FILE *f = fopen(filename, "wb");
-    if (!f) {
-        printf("Error opening file: %s\n", filename);
-        return;
-    }
-
-    // ✅ Fixed TGA header for 16-bit
-    uint8_t tga_header[18] = {
-        0,  // ID length
-        0,  // Color map type
-        2,  // Image type: uncompressed truecolor
-        0, 0, 0, 0, 0,  // Color map specification
-        0, 0,  // X-origin
-        0, 0,  // Y-origin
-        (uint8_t)(width & 0xFF), (uint8_t)((width >> 8) & 0xFF),  // Width (LE)
-        (uint8_t)(height & 0xFF), (uint8_t)((height >> 8) & 0xFF), // Height (LE)
-        16,  // ✅ Bits per pixel = 16-bit
-        0    // ✅ Descriptor: 0 (lower-left origin)
-    };
-
-    fwrite(tga_header, 1, 18, f);
-    printf("Header written.\n");
-
-    // ✅ Corrected pixel writing (bottom-up order)
-    int pixel_count = 0;
-    for (int y = height - 1; y >= 0; --y) {  // 🔹 TGA expects bottom-to-top order
-        uint8_t *row = pixel_data + y * alloc_info.pitch;
-        for (int x = 0; x < width; ++x) {
-            uint32_t pixel = *(uint32_t *)(row + x * 4);  // Read 32-bit pixel (ARGB8888)
-
-            // ✅ Convert ARGB8888 to RGB565
-            uint16_t r = (pixel >> 19) & 0x1F;  // 5 bits red
-            uint16_t g = (pixel >> 10) & 0x3F;  // 6 bits green
-            uint16_t b = (pixel >> 3)  & 0x1F;  // 5 bits blue
-            uint16_t rgb565 = (r << 11) | (g << 5) | b;  // Pack into RGB565
-
-            // ✅ Write in little-endian format
-            uint8_t color[2] = { rgb565 & 0xFF, (rgb565 >> 8) & 0xFF };
-            fwrite(color, 2, 1, f);
-
-            pixel_count++;
-        }
-    }
-
-    fclose(f);
-    printf("✅ TGA saved: %s (%d pixels)\n", filename, pixel_count);
-}
-*/
-
-void save_tga(const char *filename, gfx_bitmap_t *bitmap) {
+void save_tga(const char *filename, gfx_bitmap_t *bitmap)
+{
     printf("Saving TGA bitmap...\n");
 
     gfx_bitmap_alloc_t alloc_info;
@@ -223,40 +160,43 @@ void save_tga(const char *filename, gfx_bitmap_t *bitmap) {
         return;
     }
 
-    // Ispravno dobijanje širine i visine
     int width = paint.bparams.rect.p1.x - paint.bparams.rect.p0.x;
     int height = paint.bparams.rect.p1.y - paint.bparams.rect.p0.y;
 
-    // Početna adresa piksela
-    uint8_t *pixel_data = (uint8_t *)alloc_info.pixels + alloc_info.off0;
-printf("Attempting to save file: %s\n", filename);
-FILE *f = fopen(filename, "wb");
-if (!f) {
-    printf("Error opening file %s, errno: %d\n", filename, errno);
-    return;
-}
+    printf("save_tga: width=%d height=%d p0=(%d,%d) p1=(%d,%d)\n",
+        width, height,
+        (int)paint.bparams.rect.p0.x, (int)paint.bparams.rect.p0.y,
+        (int)paint.bparams.rect.p1.x, (int)paint.bparams.rect.p1.y);
 
-    // TGA header
+    uint8_t *pixel_data = (uint8_t *)alloc_info.pixels + alloc_info.off0;
+
+    FILE *f = fopen(filename, "wb");
+    if (!f) {
+        printf("Error opening file %s, errno: %d\n", filename, errno);
+        return;
+    }
+
+    /* TGA header */
     uint8_t header[18] = {0};
-    header[2] = 2; // True-color image (uncompressed)
-    header[12] = (width & 0xFF);     // Low byte of width
-    header[13] = (width >> 8) & 0xFF; // High byte of width
-    header[14] = (height & 0xFF);    // Low byte of height
-    header[15] = (height >> 8) & 0xFF; // High byte of height
-    header[16] = 24;  // 24 bits per pixel (BGR)
+    header[2] = 2;   /* uncompressed truecolor */
+    header[12] = (width & 0xFF);
+    header[13] = (width >> 8) & 0xFF;
+    header[14] = (height & 0xFF);
+    header[15] = (height >> 8) & 0xFF;
+    header[16] = 24; /* 24 bpp */
 
     fwrite(header, sizeof(header), 1, f);
 
-    // Upisivanje podataka u "bottom-up" redosledu
-    for (int y = height - 1; y >= 0; y--) {  // Obrnuti redosled redova
-        uint8_t *row_start = pixel_data + (paint.bparams.rect.p0.y + y) * alloc_info.pitch
-                                          + paint.bparams.rect.p0.x * 4;
+    /* Bottom-up, BGR, sa p0 offset-om */
+    for (int y = height - 1; y >= 0; y--) {
+        uint8_t *row_start = pixel_data
+            + (paint.bparams.rect.p0.y + y) * alloc_info.pitch
+            + paint.bparams.rect.p0.x * 4;
 
         for (int x = 0; x < width; x++) {
             pixel_t pix = *((pixel_t *)(row_start + x * 4));
             uint8_t bgr[3];
-            pixel2bgr_888(bgr, pix); // Konverzija u BGR format
-
+            pixel2bgr_888(bgr, pix);
             fwrite(bgr, 1, 3, f);
         }
     }
@@ -265,7 +205,89 @@ if (!f) {
     printf("TGA saved to %s\n", filename);
 }
 
+bool save_boj(const char *filename, gfx_bitmap_t *bitmap,
+    int width, int height, size_t pitch)
+{
+    gfx_bitmap_alloc_t alloc;
+    errno_t rc = gfx_bitmap_get_alloc(bitmap, &alloc);
+    if (rc != EOK) return false;
 
+    uint32_t *pixels = (uint32_t *)((uint8_t *)alloc.pixels + alloc.off0);
+
+    /* Encode u RLE */
+    rle_image_t rle;
+    rc = rle_encode(pixels, width, height, pitch, &rle);
+    if (rc != EOK) return false;
+
+    FILE *f = fopen(filename, "wb");
+    if (!f) {
+        rle_free(&rle);
+        return false;
+    }
+
+    /* Header */
+    fwrite(&width, sizeof(uint32_t), 1, f);
+    fwrite(&height, sizeof(uint32_t), 1, f);
+    fwrite(&rle.count, sizeof(size_t), 1, f);
+
+    /* RLE parovi */
+    fwrite(rle.data, sizeof(uint32_t), rle.count * 2, f);
+
+    fclose(f);
+    rle_free(&rle);
+    return true;
+}
+
+
+bool load_boj(const char *filename, gfx_bitmap_t *bitmap, size_t pitch)
+{
+
+  //  printf("load_boj: filename='%s'\n", filename);
+    FILE *f = fopen(filename, "rb");
+    if (!f) return false;
+
+    uint32_t width, height;
+    size_t count;
+
+    if (fread(&width, sizeof(uint32_t), 1, f) != 1) goto err;
+    if (fread(&height, sizeof(uint32_t), 1, f) != 1) goto err;
+    if (fread(&count, sizeof(size_t), 1, f) != 1) goto err;
+
+    /* Alociraj RLE */
+    rle_image_t rle;
+    rle.data = malloc(count * 2 * sizeof(uint32_t));
+    if (!rle.data) goto err;
+
+    rle.count = count;
+    rle.width = width;
+    rle.height = height;
+
+    if (fread(rle.data, sizeof(uint32_t), count * 2, f) != count * 2) {
+        free(rle.data);
+        goto err;
+    }
+
+    fclose(f);
+
+    /* Decode u bitmapu */
+    gfx_bitmap_alloc_t alloc;
+    errno_t rc = gfx_bitmap_get_alloc(bitmap, &alloc);
+    if (rc != EOK) {
+        free(rle.data);
+        return false;
+    }
+
+    uint32_t *pixels = (uint32_t *)((uint8_t *)alloc.pixels + alloc.off0);
+
+    rc = rle_decode(&rle, pixels, pitch);
+    free(rle.data);
+
+    return rc == EOK;
+
+err:
+    fclose(f);
+    return false;
+}
 
 // UTILS
 float roundf(float value) {
@@ -395,9 +417,9 @@ void flood_fill(sysarg_t x, sysarg_t y) {
     uint8_t chosen_b8 = (uint8_t)(chosen_b / 257);
 
     if (r == chosen_r8 && g == chosen_g8 && b == chosen_b8) {
-        printf("Colors match! No flood fill needed.\n");
+        printf("POdudarne bopje! Ne treba popunjavanje.\n");
     } else {
-        printf("Colors do not match. Flood fill needed.\n");
+        printf("Boje se ne podudaraju. Flood fill treba.\n");
         flood_fill_iterative(x, y, r, g, b, chosen_r8, chosen_g8, chosen_b8);
     }
     gfx_update(paint.gc);
@@ -506,15 +528,17 @@ void flood_fill_iterative(sysarg_t x, sysarg_t y,
         }
 
         // Popuni liniju u pixelmap i bitmap
-        for (int i = left; i < right; i++) {
-            size_t idx = p.y * (alloc.pitch / 4) + i;
+        gfx_set_color(paint.gc, paint.color);
+for (int i = left; i < right; i++) {
+    size_t idx = p.y * (alloc.pitch / 4) + i;
 
-            // Ažuriraj pixelmap
-            ((uint32_t *)pixelmap.data)[idx] = PIXEL(255, new_r, new_g, new_b);
+    // Ažuriraj pixelmap (za praćenje)
+    ((uint32_t *)pixelmap.data)[idx] = PIXEL(255, new_r, new_g, new_b);
 
-            // Ručno ažuriraj paint.bitmap
-            ((uint32_t *)alloc.pixels)[idx] = PIXEL(255, new_r, new_g, new_b);
-        }
+    // Iscrtaj preko gc
+    gfx_rect_t r = { .p0 = { i, p.y }, .p1 = { i + 1, p.y + 1 } };
+    gfx_fill_rect(paint.gc, &r);
+}
 
         // Dodaj susedne linije u red
         for (int i = left; i < right; i++) {
@@ -536,11 +560,12 @@ void flood_fill_iterative(sysarg_t x, sysarg_t y,
             }
         }
     }
-
+    printf("FFI: kraj, queue_end=%d\n", queue_end);
     free(queue);
 
     // Forsiraj ažuriranje cele površine
     gfx_update(paint.gc);
+    printf("FFI: zavrseno\n");
 }
 
 void pixelmap_to_bitmap_copy() {
@@ -653,76 +678,189 @@ const char *undo_files[MAX_UNDO] = {"undo_0.tga", "undo_1.tga"};
 const char *redo_files[MAX_REDO] = {"redo_0.tga"};
 
 // Save the current canvas state for undo
-void push_undo(void) {
-    printf("Pushing undo...\n");
+void push_undo(void)
+{
+    undo_stack_t *stack = &paint.undo_stack;
 
-    // Shift existing undo files
-    if (file_exists(undo_files[1])) {
-        printf("Deleting %s...\n", undo_files[1]);
-        delete_file(undo_files[1]); // Delete the oldest undo file
-    }
-    if (file_exists(undo_files[0])) {
-        printf("Renaming %s to %s...\n", undo_files[0], undo_files[1]);
-        vfs_rename_path(undo_files[0], undo_files[1]); // Move undo_0 to undo_1
+    /* Ako je stack pun, izbaci najstariji */
+    if (stack->count >= MAX_UNDO_STEPS) {
+        rle_free(&stack->steps[0]);
+        for (int i = 1; i < stack->count; i++)
+            stack->steps[i - 1] = stack->steps[i];
+        stack->count--;
+        if (stack->head > 0)
+            stack->head--;
     }
 
-    // Save the current canvas to undo_0.tga
-    printf("Saving current state to %s...\n", undo_files[0]);
-    save_tga(undo_files[0], paint.bitmap);
+    /* Uzmi piksele iz paint.bitmap */
+    gfx_bitmap_alloc_t alloc;
+    errno_t rc = gfx_bitmap_get_alloc(paint.bitmap, &alloc);
+    if (rc != EOK) {
+        printf("push_undo: greska pri get_alloc (%d)\n", rc);
+        return;
+    }
+
+    uint32_t *pixels = (uint32_t *)((uint8_t *)alloc.pixels + alloc.off0);
+
+    /* Encode u RLE */
+    rle_image_t rle;
+    rc = rle_encode(pixels, paint.width, paint.height, alloc.pitch, &rle);
+    if (rc != EOK) {
+        printf("push_undo: greska pri encode (%d)\n", rc);
+        return;
+    }
+
+    /* Sačuvaj u stack */
+    stack->steps[stack->count] = rle;
+    stack->count++;
+    stack->head = stack->count;
+
+    printf("push_undo: step %d, %zu parova, %zu bajtova\n",
+        stack->count, rle.count, rle_size_bytes(&rle));
 }
 
 // Undo: Restore the canvas from the most recent undo file
-void undo(void) {
-    printf("Undo triggered...\n");
+void undo(void)
+{
+    undo_stack_t *stack = &paint.undo_stack;
 
-    if (!file_exists(undo_files[1])) {
-        printf("No undo steps available.\n");
+    if (stack->head <= 1) {
+        printf("undo: nema koraka\n");
         return;
     }
 
-    // Save the current canvas to redo_0.tga (for redo)
-    if (file_exists(redo_files[0])) {
-        printf("Deleting %s...\n", redo_files[0]);
-        delete_file(redo_files[0]); // Delete existing redo file
-    }
-    printf("Saving current state to %s...\n", redo_files[0]);
-    save_tga(redo_files[0], paint.bitmap);
+    stack->head--;
+    rle_image_t *rle = &stack->steps[stack->head - 1];
 
-    // Restore the canvas from undo_1.tga (previous state)
-    printf("Restoring from %s...\n", undo_files[1]);
-    img_load(paint.gc, undo_files[1], &paint.bitmap, &paint.bparams.rect);
+    /* 1) Napravi temp bitmapu (bez bmpf_direct_output) */
+    gfx_bitmap_params_t params;
+    gfx_bitmap_params_init(&params);
+    params.rect.p0.x = 0;
+    params.rect.p0.y = 0;
+    params.rect.p1.x = paint.width;
+    params.rect.p1.y = paint.height;
 
-    // Shift undo files
-    if (file_exists(undo_files[0])) {
-        printf("Renaming %s to %s...\n", undo_files[0], undo_files[1]);
-        vfs_rename_path(undo_files[0], undo_files[1]); // Move undo_0 to undo_1
-    } else {
-        printf("Deleting %s...\n", undo_files[1]);
-        delete_file(undo_files[1]); // No more undo steps
+    gfx_bitmap_t *temp_bmp = NULL;
+    errno_t rc = gfx_bitmap_create(paint.gc, &params, NULL, &temp_bmp);
+    if (rc != EOK) {
+        printf("undo: greska pri kreiranju temp bitmap\n");
+        return;
     }
+
+    /* 2) Uzmi alloc za temp bitmapu */
+    gfx_bitmap_alloc_t temp_alloc;
+    gfx_bitmap_get_alloc(temp_bmp, &temp_alloc);
+    uint32_t *temp_pixels = (uint32_t *)((uint8_t *)temp_alloc.pixels + temp_alloc.off0);
+
+    /* 3) Decode RLE u temp bitmapu */
+    rc = rle_decode(rle, temp_pixels, temp_alloc.pitch);
+    if (rc != EOK) {
+        printf("undo: greska pri decode\n");
+        gfx_bitmap_destroy(temp_bmp);
+        return;
+    }
+
+    /* 4) Kopiraj u paint.bitmap */
+    gfx_bitmap_alloc_t paint_alloc;
+    gfx_bitmap_get_alloc(paint.bitmap, &paint_alloc);
+    uint32_t *paint_pixels = (uint32_t *)((uint8_t *)paint_alloc.pixels + paint_alloc.off0);
+
+    /* Kopiraj red po red (poštuj pitch) */
+    size_t row_bytes = paint.width * 4;
+    for (uint32_t y = 0; y <(unsigned int)paint.height; y++) {
+        memcpy((uint8_t *)paint_pixels + y * paint_alloc.pitch,
+               (uint8_t *)temp_pixels + y * temp_alloc.pitch,
+               row_bytes);
+    }
+
+    /* 5) Renderuj temp bitmapu na gc */
+    rc = gfx_bitmap_render(temp_bmp, &params.rect, NULL);
+    if (rc != EOK) {
+        printf("undo: greska pri render\n");
+        gfx_bitmap_destroy(temp_bmp);
+        return;
+    }
+
+    gfx_update(paint.gc);
+    ui_menu_bar_paint(paint.menubar);
+    ui_wdecor_paint(paint.wdecor);
+
+    gfx_bitmap_destroy(temp_bmp);
+
+    printf("undo: vracen korak %d\n", stack->head);
 }
 
 
-// Redo: Restore the canvas from the redo file
-void redo(void) {
-    printf("Redo triggered...\n");
 
-    if (!file_exists(redo_files[0])) {
-        printf("No redo steps available.\n");
+// Redo: Restore the canvas from the redo file
+void redo(void)
+{
+    undo_stack_t *stack = &paint.undo_stack;
+
+    if (stack->head >= stack->count) {
+        printf("redo: nema koraka (head=%d count=%d)\n",
+            stack->head, stack->count);
         return;
     }
 
-    // Save the current canvas to undo_0.tga (for undo)
-    printf("Pushing undo for redo...\n");
-    push_undo();
+    stack->head++;
+    rle_image_t *rle = &stack->steps[stack->head - 1];
 
-    // Restore the canvas from redo_0.tga
-    printf("Restoring from %s...\n", redo_files[0]);
-    img_load(paint.gc, redo_files[0], &paint.bitmap, &paint.bparams.rect);
+    /* 1) Napravi temp bitmapu */
+    gfx_bitmap_params_t params;
+    gfx_bitmap_params_init(&params);
+    params.rect.p0.x = 0;
+    params.rect.p0.y = 0;
+    params.rect.p1.x = paint.width;
+    params.rect.p1.y = paint.height;
 
-    // Delete the redo file
-    printf("Deleting %s...\n", redo_files[0]);
-    delete_file(redo_files[0]);
+    gfx_bitmap_t *temp_bmp = NULL;
+    errno_t rc = gfx_bitmap_create(paint.gc, &params, NULL, &temp_bmp);
+    if (rc != EOK) {
+        printf("redo: greska pri kreiranju temp bitmap\n");
+        return;
+    }
+
+    /* 2) Uzmi alloc za temp bitmapu */
+    gfx_bitmap_alloc_t temp_alloc;
+    gfx_bitmap_get_alloc(temp_bmp, &temp_alloc);
+    uint32_t *temp_pixels = (uint32_t *)((uint8_t *)temp_alloc.pixels + temp_alloc.off0);
+
+    /* 3) Decode RLE */
+    rc = rle_decode(rle, temp_pixels, temp_alloc.pitch);
+    if (rc != EOK) {
+        printf("redo: greska pri decode\n");
+        gfx_bitmap_destroy(temp_bmp);
+        return;
+    }
+
+    /* 4) Kopiraj u paint.bitmap */
+    gfx_bitmap_alloc_t paint_alloc;
+    gfx_bitmap_get_alloc(paint.bitmap, &paint_alloc);
+    uint32_t *paint_pixels = (uint32_t *)((uint8_t *)paint_alloc.pixels + paint_alloc.off0);
+
+    size_t row_bytes = paint.width * 4;
+    for (uint32_t y = 0; y < (unsigned int)paint.height; y++) {
+        memcpy((uint8_t *)paint_pixels + y * paint_alloc.pitch,
+               (uint8_t *)temp_pixels + y * temp_alloc.pitch,
+               row_bytes);
+    }
+
+    /* 5) Renderuj temp bitmapu */
+    rc = gfx_bitmap_render(temp_bmp, &params.rect, NULL);
+    if (rc != EOK) {
+        printf("redo: greska pri render\n");
+        gfx_bitmap_destroy(temp_bmp);
+        return;
+    }
+
+    gfx_update(paint.gc);
+    ui_menu_bar_paint(paint.menubar);
+    ui_wdecor_paint(paint.wdecor);
+
+    gfx_bitmap_destroy(temp_bmp);
+
+    printf("redo: vracen korak %d\n", stack->head);
 }
 
 bool img_load(gfx_context_t *gc, const char *fname, gfx_bitmap_t **rbitmap, gfx_rect_t *rect) {
@@ -912,5 +1050,18 @@ bool file_exists(const char *path) {
 }
 
 
+void undo_stack_clear(void)
+{
+    undo_stack_t *stack = &paint.undo_stack;
+
+    for (int i = 0; i < stack->count; i++) {
+        rle_free(&stack->steps[i]);
+    }
+
+    stack->count = 0;
+    stack->head = 0;
+
+    printf("undo_stack_clear: stack ociscen\n");
+}
 /** @}
  */
