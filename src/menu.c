@@ -4,6 +4,8 @@
 #include <ui/menudd.h>
 #include <ui/menuentry.h>
 #include <ui/msgdialog.h>
+#include <ui/filedialog.h>
+#include <ui/promptdialog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <str.h>
@@ -14,6 +16,7 @@ static void menu_action_new(ui_menu_entry_t *entry, void *arg);
 static void menu_action_open(ui_menu_entry_t *entry, void *arg);
 static void menu_action_save(ui_menu_entry_t *entry, void *arg);
 static void menu_action_save_as(ui_menu_entry_t *entry, void *arg);
+
 static void menu_action_exit(ui_menu_entry_t *entry, void *arg);
 static void menu_action_flood_fill(ui_menu_entry_t *entry, void *arg);
 static void menu_action_undo(ui_menu_entry_t *entry, void *arg);
@@ -39,6 +42,148 @@ static void menu_action_shape_rectangle(ui_menu_entry_t *entry, void *arg);
 static void menu_action_shape_circle_filled(ui_menu_entry_t *entry, void *arg);
 static void menu_action_shape_rectangle_filled(ui_menu_entry_t *entry, void *arg);
 static void menu_action_help(ui_menu_entry_t *entry, void *arg);
+
+
+
+    
+/* Callback za file dialog */
+static void file_dialog_bok(ui_file_dialog_t *dialog, void *arg, const char *fname);
+static void file_dialog_bcancel(ui_file_dialog_t *dialog, void *arg);
+static void file_dialog_close(ui_file_dialog_t *dialog, void *arg);
+
+static ui_file_dialog_cb_t file_dialog_cb = {
+    .bok = file_dialog_bok,
+    .bcancel = file_dialog_bcancel,
+    .close = file_dialog_close
+};
+
+//kreacija fajl dijaloga
+static void file_dialog_bok(ui_file_dialog_t *dialog, void *arg, const char *fname)
+{
+    paint_t *paint = (paint_t *)arg;
+
+    printf("CALLBACK: pozvan\n");
+    printf("CALLBACK: fname=%p\n", (void*)fname);
+    if (fname) {
+        printf("CALLBACK: fname='%s', len=%zu\n", fname, str_length(fname));
+    }
+
+    ui_file_dialog_destroy(dialog);
+
+        /* 1) Obriši undo/redo stack */
+        undo_stack_clear();
+
+    /* Obriši postojeću sliku */
+    clear_canvas();
+
+    /* Učitaj BOJ */
+    gfx_bitmap_alloc_t alloc;
+    gfx_bitmap_get_alloc(paint->bitmap, &alloc);
+
+    if (load_boj(fname, paint->bitmap, alloc.pitch)) {
+      //  gfx_bitmap_render(paint->bitmap, &paint->bparams.rect, NULL);
+        gfx_update(paint->gc);
+        push_undo();
+        printf("Ucitano: %s\n", fname);
+        update_status_bar1(paint, fname);
+    } else {
+        printf("Greska pri ucitavanju: %s\n", fname);
+        update_status_bar1(paint, "Greska pri ucitavanju");
+    }
+}
+
+static void file_dialog_bcancel(ui_file_dialog_t *dialog, void *arg)
+{
+    (void)arg;
+    ui_file_dialog_destroy(dialog);
+    printf("Otvori: otkazano\n");
+}
+
+static void file_dialog_close(ui_file_dialog_t *dialog, void *arg)
+{
+    (void)arg;
+    ui_file_dialog_destroy(dialog);
+    printf("Otvori: zatvoreno\n");
+}
+
+
+/* Forward deklaracije */
+static void save_prompt_bok(ui_prompt_dialog_t *dialog, void *arg, const char *text);
+static void save_prompt_bcancel(ui_prompt_dialog_t *dialog, void *arg);
+static void save_prompt_close(ui_prompt_dialog_t *dialog, void *arg);
+
+static ui_prompt_dialog_cb_t save_prompt_cb = {
+    .bok = save_prompt_bok,
+    .bcancel = save_prompt_bcancel,
+    .close = save_prompt_close
+};
+
+void menu_action_save_as(ui_menu_entry_t *entry, void *arg)
+{
+    paint_t *paint = (paint_t *)arg;
+    ui_prompt_dialog_params_t pdparams;
+    ui_prompt_dialog_t *dialog;
+    errno_t rc;
+
+    ui_prompt_dialog_params_init(&pdparams);
+    pdparams.caption = "Sacuvaj kao";
+    pdparams.prompt = "Unesi ime fajla:";
+
+    rc = ui_prompt_dialog_create(paint->ui, &pdparams, &dialog);
+    if (rc != EOK) {
+        printf("Greska pri kreiranju prompt dijaloga\n");
+        return;
+    }
+
+    ui_prompt_dialog_set_cb(dialog, &save_prompt_cb, paint);
+}
+
+static void save_prompt_bok(ui_prompt_dialog_t *dialog, void *arg, const char *text)
+{
+    paint_t *paint = (paint_t *)arg;
+
+    /* Kopiraj ime PRE destroy-a */
+    char *fname = str_dup(text);
+    if (!fname) return;
+
+    ui_prompt_dialog_destroy(dialog);
+
+    /* Dodaj .boj ako nema */
+    size_t len = str_length(fname);
+    if (len < 4 || str_cmp(fname + len - 4, ".boj") != 0) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "%s.boj", fname);
+        free(fname);
+        fname = str_dup(buf);
+    }
+
+    printf("Sacuvaj kao: '%s'\n", fname);
+
+    gfx_bitmap_alloc_t alloc;
+    gfx_bitmap_get_alloc(paint->bitmap, &alloc);
+
+    if (save_boj(fname, paint->bitmap, paint->width, paint->height, alloc.pitch)) {
+        printf("Sacuvano: %s\n", fname);
+        update_status_bar1(paint, fname);
+    } else {
+        printf("Greska pri cuvanju: %s\n", fname);
+        update_status_bar1(paint, "Greska pri cuvanju");
+    }
+
+    free(fname);
+}
+
+static void save_prompt_bcancel(ui_prompt_dialog_t *dialog, void *arg)
+{
+    (void)arg;
+    ui_prompt_dialog_destroy(dialog);
+}
+
+static void save_prompt_close(ui_prompt_dialog_t *dialog, void *arg)
+{
+    (void)arg;
+    ui_prompt_dialog_destroy(dialog);
+}
 
 // Function to create menu bar
 errno_t create_menu_bar(paint_t *paint) {
@@ -83,13 +228,15 @@ errno_t create_menu_bar(paint_t *paint) {
     ui_menu_entry_t *shape_rectangle_entry = NULL;
     ui_menu_entry_t *shape_rectangle_filled_entry = NULL;
 
-    ui_menu_entry_t *help_entry = NULL;  // Help menu entry
+    ui_menu_entry_t *help_entry = NULL;  // Help stavke menija
 
     gfx_rect_t rectm;
     rectm.p0.x = 5;
     rectm.p0.y = 25;
     rectm.p1.x = paint->rect.p1.x - 5;
     rectm.p1.y = 42;
+
+
 
     /* Create the menu bar */
     rc = ui_menu_bar_create(paint->ui, paint->window, &paint->menubar);
@@ -108,35 +255,38 @@ errno_t create_menu_bar(paint_t *paint) {
 
     rc = ui_menu_entry_create(file_menu, "Novo", "Ctrl+N", &file_new_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju NEW menu entry.\n");
+        printf("Greska pri kreiranju NEW stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(file_new_entry, menu_action_new, paint);
 
     rc = ui_menu_entry_create(file_menu, "Otvori", "Ctrl+O", &file_open_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Open menu entry.\n");
+        printf("Greska pri kreiranju Open stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(file_open_entry, menu_action_open, paint);
 
     rc = ui_menu_entry_create(file_menu, "Sacuvaj", "Ctrl+S", &file_save_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Save menu entry.\n");
+        printf("Greska pri kreiranju Save stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(file_save_entry, menu_action_save, paint);
 
-    rc = ui_menu_entry_create(file_menu, "Sacuvaj kao", "Ctrl+Shift+S", &file_save_as_entry);
+
+    rc = ui_menu_entry_create(file_menu, "Sacuvaj kao", "Ctrl+Shift+S",
+        &file_save_as_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Save As menu entry.\n");
+        printf("Greska pri kreiranju Save As entry\n");
         return rc;
     }
     ui_menu_entry_set_cb(file_save_as_entry, menu_action_save_as, paint);
 
+
     rc = ui_menu_entry_create(file_menu, "Izlaz", "Ctrl+Q", &file_exit_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Exit menu entry.\n");
+        printf("Greska pri kreiranju Exit stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(file_exit_entry, menu_action_exit, NULL);
@@ -150,7 +300,7 @@ errno_t create_menu_bar(paint_t *paint) {
 
     rc = ui_menu_entry_create(edit_menu, "Popuni", "Ctrl+F", &action_flood_fill_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Flood fill menu entry.\n");
+        printf("Greska pri kreiranju Flood fill stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(action_flood_fill_entry, menu_action_flood_fill, paint);
@@ -158,21 +308,21 @@ errno_t create_menu_bar(paint_t *paint) {
 
     rc = ui_menu_entry_create(edit_menu, "Undo", "Ctrl+Z", &action_undo_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Undo menu entry.\n");
+        printf("Greska pri kreiranju Undo stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(action_undo_entry, menu_action_undo, paint);
 
     rc = ui_menu_entry_create(edit_menu, "Redo", "Ctrl+Y", &action_redo_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Redo menu entry.\n");
+        printf("Greska pri kreiranju Redo stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(action_redo_entry, menu_action_redo, paint);
 
     rc = ui_menu_entry_create(edit_menu, "Zoom", "Ctrl+Z", &action_zoom_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Zoom menu entry.\n");
+        printf("Greska pri kreiranju Zoom stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(action_zoom_entry, menu_action_zoom, paint);
@@ -186,35 +336,35 @@ errno_t create_menu_bar(paint_t *paint) {
 
     rc = ui_menu_entry_create(size_menu, "1", "Ctrl+1", &size_1_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Size 1 menu entry.\n");
+        printf("Greska pri kreiranju Size 1 stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(size_1_entry, menu_action_size_1, paint);
 
     rc = ui_menu_entry_create(size_menu, "2", "Ctrl+2", &size_2_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Size 2 menu entry.\n");
+        printf("Greska pri kreiranju Size 2 stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(size_2_entry, menu_action_size_2, paint);
 
     rc = ui_menu_entry_create(size_menu, "3", "Ctrl+3", &size_3_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Size 3 menu entry.\n");
+        printf("Greska pri kreiranju Size 3 stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(size_3_entry, menu_action_size_3, paint);
 
     rc = ui_menu_entry_create(size_menu, "4", "Ctrl+4", &size_4_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Size 4 menu entry.\n");
+        printf("Greska pri kreiranju Size 4 stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(size_4_entry, menu_action_size_4, paint);
 
     rc = ui_menu_entry_create(size_menu, "5", "Ctrl+5", &size_5_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Size 5 menu entry.\n");
+        printf("Greska pri kreiranju Size 5 stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(size_5_entry, menu_action_size_5, paint);
@@ -222,62 +372,62 @@ errno_t create_menu_bar(paint_t *paint) {
     /* Create Color menu */
     rc = ui_menu_dd_create(paint->menubar, "~B~oja", NULL, &color_menu);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Color menu.\n");
+        printf("Greska pri kreiranju menija Boja.\n");
         return rc;
     }
 
     rc = ui_menu_entry_create(color_menu, "Crvena", "Ctrl+R", &color_red_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Red color menu entry.\n");
+        printf("Greska pri kreiranju Crvena izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_red_entry, menu_action_color_red, paint);
 
     rc = ui_menu_entry_create(color_menu, "Zelena", "Ctrl+G", &color_green_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Green color menu entry.\n");
+        printf("Greska pri kreiranju Zelena izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_green_entry, menu_action_color_green, paint);
 
     rc = ui_menu_entry_create(color_menu, "Plava", "Ctrl+B", &color_blue_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Blue color menu entry.\n");
+        printf("Greska pri kreiranju PLava izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_blue_entry, menu_action_color_blue, paint);
 
     rc = ui_menu_entry_create(color_menu, "Bela", "Ctrl+W", &color_white_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju White color menu entry.\n");
+        printf("Greska pri kreiranju Bela izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_white_entry, menu_action_color_white, paint);
 
     rc = ui_menu_entry_create(color_menu, "Crna", "Ctrl+K", &color_black_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Black color menu entry.\n");
+        printf("Greska pri kreiranju Crna izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_black_entry, menu_action_color_black, paint);
 
     rc = ui_menu_entry_create(color_menu, "Zuta", "Ctrl+Shift+Y", &color_yellow_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Yellow color menu entry.\n");
+        printf("Greska pri kreiranju Zuta izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_yellow_entry, menu_action_color_yellow, paint);
 
     rc = ui_menu_entry_create(color_menu, "Narandzasta", "Ctrl+Shift+O", &color_orange_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Orange color menu entry.\n");
+        printf("Greska pri kreiranju Narandzasta izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_orange_entry, menu_action_color_orange, paint);
 
     rc = ui_menu_entry_create(color_menu, "Braon", "Ctrl+N", &color_brown_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Brown color menu entry.\n");
+        printf("Greska pri kreiranju Braon izbora menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(color_brown_entry, menu_action_color_brown, paint);
@@ -291,28 +441,28 @@ errno_t create_menu_bar(paint_t *paint) {
 
     rc = ui_menu_entry_create(shape_menu, "Slobodno", "Ctrl+H", &shape_handwrite_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Handwrite shape menu entry.\n");
+        printf("Greska pri kreiranju Handwrite shape stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(shape_handwrite_entry, menu_action_shape_handwrite, paint);
 
     rc = ui_menu_entry_create(shape_menu, "Linija", "Ctrl+L", &shape_line_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Line shape menu entry.\n");
+        printf("Greska pri kreiranju Line shape stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(shape_line_entry, menu_action_shape_line, paint);
 
     rc = ui_menu_entry_create(shape_menu, "Krug", "Ctrl+C", &shape_circle_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Circle shape menu entry.\n");
+        printf("Greska pri kreiranju Circle shape stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(shape_circle_entry, menu_action_shape_circle, paint);
 
     rc = ui_menu_entry_create(shape_menu, "Pun Krug", "Ctrl+D", &shape_circle_filled_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Filled Circle shape menu entry.\n");
+        printf("Greska pri kreiranju Filled Circle shape stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(shape_circle_filled_entry, menu_action_shape_circle_filled, paint);
@@ -320,14 +470,14 @@ errno_t create_menu_bar(paint_t *paint) {
 
     rc = ui_menu_entry_create(shape_menu, "Pun Cetvorougao", "Ctrl+F", &shape_rectangle_filled_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju FILLED Rectangle shape menu entry.\n");
+        printf("Greska pri kreiranju FILLED Rectangle shape stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(shape_rectangle_filled_entry, menu_action_shape_rectangle_filled, paint);
 
     rc = ui_menu_entry_create(shape_menu, "Cetvorougao", "Ctrl+R", &shape_rectangle_entry);
     if (rc != EOK) {
-        printf("Greska pri kreiranju Rectangle shape menu entry.\n");
+        printf("Greska pri kreiranju Rectangle shape stavke menija.\n");
         return rc;
     }
     ui_menu_entry_set_cb(shape_rectangle_entry, menu_action_shape_rectangle, paint);
@@ -339,15 +489,15 @@ errno_t create_menu_bar(paint_t *paint) {
         printf("Greska pri kreiranju Help menu.\n");
         return rc;
     }
-printf("Pre Help menu entry.\n");
+printf("Pre Help stavke menija.\n");
     rc = ui_menu_entry_create(help_menu, "Pomoc", "F1", &help_entry);
     if (rc != EOK) {
-       printf("Greska pri kreiranju Help menu entry.\n");
+       printf("Greska pri kreiranju Help stavke menija.\n");
         return rc;
     }
 
     ui_menu_entry_set_cb(help_entry, menu_action_help, paint);
-printf("zavrsio cb.\n");
+
 
     /* Paint the menu bar */
     ui_menu_bar_paint(paint->menubar);
@@ -356,24 +506,44 @@ printf("zavrsio cb.\n");
 
 // Action callbacks for menu entries
 void menu_action_new(ui_menu_entry_t *entry, void *arg) {
-    printf("NEW action triggered\n");
+    undo_stack_clear();
     clear_canvas();
     push_undo();
 }
 
 // Action callbacks for menu entries
-void menu_action_open(ui_menu_entry_t *entry, void *arg) {
-    printf("Open action triggered\n");
+void menu_action_open(ui_menu_entry_t *entry, void *arg)
+{
+    paint_t *paint = (paint_t *)arg;
+    ui_file_dialog_params_t fdparams;
+    errno_t rc;
+
+    ui_file_dialog_params_init(&fdparams);
+    fdparams.caption = "Otvori BOJ sliku";
+
+    rc = ui_file_dialog_create(paint->ui, &fdparams, &paint->dialog);
+    if (rc != EOK) {
+        printf("Greska pri kreiranju file dijaloga.\n");
+        return;
+    }
+
+    ui_file_dialog_set_cb(paint->dialog, &file_dialog_cb, paint);
 }
 
-void menu_action_save(ui_menu_entry_t *entry, void *arg) {
-    save_tga("output.tga", paint.bitmap);
-    printf("Save action triggered\n");
+void menu_action_save(ui_menu_entry_t *entry, void *arg)
+{
+    gfx_bitmap_alloc_t alloc;
+    gfx_bitmap_get_alloc(paint.bitmap, &alloc);
+
+    if (save_boj("output.boj", paint.bitmap,
+                 paint.width, paint.height, alloc.pitch)) {
+        printf("Sacuvano: output.boj\n");
+        update_status_bar1(&paint, "Sacuvano: output.boj");
+    } else {
+        printf("Greska pri cuvanju\n");
+    }
 }
 
-void menu_action_save_as(ui_menu_entry_t *entry, void *arg) {
-    printf("Save As action triggered\n");
-}
 
 void menu_action_exit(ui_menu_entry_t *entry, void *arg) {
     printf("Exit action triggered\n");
