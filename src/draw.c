@@ -22,7 +22,7 @@
 #include "../include/draw.h"
 #include <gfx/bitmap.h>
 #include <types/gfx/bitmap.h>
-#include <memgfx/memgc.h> // Ensure this header is included  // Include the header for gfx_cursor_get_pos     // Include the header for ui_paint_filled_circle and ui_fcircle_entire
+#include <memgfx/memgc.h>
 #include <ui/menubar.h>
 #include <ui/menudd.h>
 
@@ -31,10 +31,10 @@
 #include "../private/memgc.h"
 
 //NOVO
-#include <gfximage/tga.h>     // Include the header for ui_paint_filled_circle and ui_fcircle_entire
+#include <gfximage/tga.h>   
 #include <vfs/vfs.h>
 
-#define MAX_STACK_SIZE 10000  // Adjust based on your needs
+#define MAX_STACK_SIZE 10000  
 
 typedef struct {
     int x, y;
